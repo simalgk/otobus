@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("otobus")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c5bc93d9ed466d474cdd3c1bdc3a39ca7f8792b1")]
 [assembly: System.Reflection.AssemblyProductAttribute("otobus")]
 [assembly: System.Reflection.AssemblyTitleAttribute("otobus")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
