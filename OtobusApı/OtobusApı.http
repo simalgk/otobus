@@ -1,0 +1,6 @@
+@OtobusApı_HostAddress = http://localhost:5220
+
+GET {{OtobusApı_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
