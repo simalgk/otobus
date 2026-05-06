@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "JCtgUXjCmA8=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Melike\\Desktop\\frontend\\otobus\\otobus.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Melike\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.2\\microsoft.aspnetcore.app.internal.assets.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
