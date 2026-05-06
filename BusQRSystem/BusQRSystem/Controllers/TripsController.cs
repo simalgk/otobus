@@ -1,7 +1,6 @@
 using BusQRSystem.Data;
 using BusQRSystem.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace BusQRSystem.Controllers;
 
@@ -9,49 +8,40 @@ namespace BusQRSystem.Controllers;
 [Route("api/[controller]")]
 public class TripsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly InMemoryBusStore _store;
 
-    public TripsController(AppDbContext context)
+    public TripsController(InMemoryBusStore store)
     {
-        _context = context;
+        _store = store;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TripResponse>>> GetTrips()
+    public ActionResult<IEnumerable<TripResponse>> GetTrips()
     {
-        var trips = await _context.Trips
-            .AsNoTracking()
-            .Include(trip => trip.Bus)
+        _store.SeedDemo();
+        return Ok(_store.Trips
             .OrderByDescending(trip => trip.KalkisSaati)
-            .Select(trip => ToResponse(trip))
-            .ToListAsync();
-
-        return Ok(trips);
+            .Select(ToResponse));
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<TripDetailResponse>> GetTrip(int id)
+    public ActionResult<TripDetailResponse> GetTrip(int id)
     {
-        var trip = await _context.Trips
-            .AsNoTracking()
-            .Include(trip => trip.Bus)
-            .Include(trip => trip.TripPassengers)
-            .ThenInclude(tripPassenger => tripPassenger.Passenger)
-            .FirstOrDefaultAsync(trip => trip.Id == id);
-
+        var trip = _store.Trips.FirstOrDefault(item => item.Id == id);
         if (trip is null)
         {
             return NotFound();
         }
 
-        var passengers = trip.TripPassengers
-            .OrderBy(tripPassenger => tripPassenger.KoltukNo)
-            .Select(tripPassenger => new TripPassengerSummary(
-                tripPassenger.Id,
-                tripPassenger.PassengerId,
-                $"{tripPassenger.Passenger.Ad} {tripPassenger.Passenger.Soyad}",
-                tripPassenger.KoltukNo,
-                tripPassenger.BiletAktifMi))
+        var passengers = _store.TripPassengers
+            .Where(item => item.TripId == id)
+            .OrderBy(item => item.KoltukNo)
+            .Select(item => new TripPassengerSummary(
+                item.Id,
+                item.PassengerId,
+                $"{item.Passenger.Ad} {item.Passenger.Soyad}",
+                item.KoltukNo,
+                item.BiletAktifMi))
             .ToList();
 
         return Ok(new TripDetailResponse(
@@ -68,15 +58,14 @@ public class TripsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<TripResponse>> CreateTrip(CreateTripRequest request)
+    public ActionResult<TripResponse> CreateTrip(CreateTripRequest request)
     {
-        var busExists = await _context.Buses.AnyAsync(bus => bus.Id == request.BusId);
-        if (!busExists)
+        if (_store.Buses.All(bus => bus.Id != request.BusId))
         {
             return BadRequest("Seçilen otobüs bulunamadı.");
         }
 
-        var trip = new Trip
+        var trip = _store.AddTrip(new Trip
         {
             BusId = request.BusId,
             KalkisSehri = request.KalkisSehri,
@@ -84,57 +73,9 @@ public class TripsController : ControllerBase
             KalkisSaati = request.KalkisSaati,
             VarisSaati = request.VarisSaati,
             Durum = request.Durum
-        };
+        });
 
-        _context.Trips.Add(trip);
-        await _context.SaveChangesAsync();
-
-        var created = await _context.Trips
-            .AsNoTracking()
-            .Include(existing => existing.Bus)
-            .FirstAsync(existing => existing.Id == trip.Id);
-
-        return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, ToResponse(created));
-    }
-
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> UpdateTrip(int id, UpdateTripRequest request)
-    {
-        var trip = await _context.Trips.FindAsync(id);
-        if (trip is null)
-        {
-            return NotFound();
-        }
-
-        var busExists = await _context.Buses.AnyAsync(bus => bus.Id == request.BusId);
-        if (!busExists)
-        {
-            return BadRequest("Seçilen otobüs bulunamadı.");
-        }
-
-        trip.BusId = request.BusId;
-        trip.KalkisSehri = request.KalkisSehri;
-        trip.VarisSehri = request.VarisSehri;
-        trip.KalkisSaati = request.KalkisSaati;
-        trip.VarisSaati = request.VarisSaati;
-        trip.Durum = request.Durum;
-
-        await _context.SaveChangesAsync();
-        return NoContent();
-    }
-
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteTrip(int id)
-    {
-        var trip = await _context.Trips.FindAsync(id);
-        if (trip is null)
-        {
-            return NotFound();
-        }
-
-        _context.Trips.Remove(trip);
-        await _context.SaveChangesAsync();
-        return NoContent();
+        return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, ToResponse(trip));
     }
 
     private static TripResponse ToResponse(Trip trip) =>

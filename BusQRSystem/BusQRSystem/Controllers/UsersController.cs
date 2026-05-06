@@ -1,7 +1,6 @@
 using BusQRSystem.Data;
 using BusQRSystem.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace BusQRSystem.Controllers;
 
@@ -9,42 +8,39 @@ namespace BusQRSystem.Controllers;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly InMemoryBusStore _store;
 
-    public UsersController(AppDbContext context)
+    public UsersController(InMemoryBusStore store)
     {
-        _context = context;
+        _store = store;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UserResponse>>> GetUsers()
+    public ActionResult<IEnumerable<UserResponse>> GetUsers()
     {
-        var users = await _context.Users
-            .AsNoTracking()
+        _store.SeedDemo();
+        return Ok(_store.Users
             .OrderBy(user => user.Ad)
             .ThenBy(user => user.Soyad)
-            .Select(user => ToResponse(user))
-            .ToListAsync();
-
-        return Ok(users);
+            .Select(ToResponse));
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<UserResponse>> GetUser(int id)
+    public ActionResult<UserResponse> GetUser(int id)
     {
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Id == id);
+        var user = _store.Users.FirstOrDefault(item => item.Id == id);
         return user is null ? NotFound() : Ok(ToResponse(user));
     }
 
     [HttpPost]
-    public async Task<ActionResult<UserResponse>> CreateUser(CreateUserRequest request)
+    public ActionResult<UserResponse> CreateUser(CreateUserRequest request)
     {
-        if (await _context.Users.AnyAsync(user => user.Email == request.Email))
+        if (_store.Users.Any(user => user.Email == request.Email))
         {
             return Conflict("Bu e-posta adresi zaten kayıtlı.");
         }
 
-        var user = new User
+        var user = _store.AddUser(new User
         {
             Ad = request.Ad,
             Soyad = request.Soyad,
@@ -54,27 +50,18 @@ public class UsersController : ControllerBase
             QrCodeValue = string.IsNullOrWhiteSpace(request.QrCodeValue)
                 ? Guid.NewGuid().ToString("N")
                 : request.QrCodeValue
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        });
 
         return CreatedAtAction(nameof(GetUser), new { id = user.Id }, ToResponse(user));
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> UpdateUser(int id, UpdateUserRequest request)
+    public IActionResult UpdateUser(int id, UpdateUserRequest request)
     {
-        var user = await _context.Users.FindAsync(id);
+        var user = _store.Users.FirstOrDefault(item => item.Id == id);
         if (user is null)
         {
             return NotFound();
-        }
-
-        var emailTaken = await _context.Users.AnyAsync(existing => existing.Id != id && existing.Email == request.Email);
-        if (emailTaken)
-        {
-            return Conflict("Bu e-posta adresi başka bir kullanıcıya ait.");
         }
 
         user.Ad = request.Ad;
@@ -83,22 +70,19 @@ public class UsersController : ControllerBase
         user.Telefon = request.Telefon;
         user.Role = request.Role;
         user.QrCodeValue = request.QrCodeValue;
-
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteUser(int id)
+    public IActionResult DeleteUser(int id)
     {
-        var user = await _context.Users.FindAsync(id);
+        var user = _store.Users.FirstOrDefault(item => item.Id == id);
         if (user is null)
         {
             return NotFound();
         }
 
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+        _store.Users.Remove(user);
         return NoContent();
     }
 
@@ -106,27 +90,8 @@ public class UsersController : ControllerBase
         new(user.Id, user.Ad, user.Soyad, user.Email, user.Telefon, user.Role, user.QrCodeValue);
 }
 
-public record CreateUserRequest(
-    string Ad,
-    string Soyad,
-    string Email,
-    string Telefon,
-    string Role,
-    string? QrCodeValue);
+public record CreateUserRequest(string Ad, string Soyad, string Email, string Telefon, string Role, string? QrCodeValue);
 
-public record UpdateUserRequest(
-    string Ad,
-    string Soyad,
-    string Email,
-    string Telefon,
-    string Role,
-    string QrCodeValue);
+public record UpdateUserRequest(string Ad, string Soyad, string Email, string Telefon, string Role, string QrCodeValue);
 
-public record UserResponse(
-    int Id,
-    string Ad,
-    string Soyad,
-    string Email,
-    string Telefon,
-    string Role,
-    string QrCodeValue);
+public record UserResponse(int Id, string Ad, string Soyad, string Email, string Telefon, string Role, string QrCodeValue);

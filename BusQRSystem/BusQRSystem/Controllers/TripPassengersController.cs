@@ -1,7 +1,6 @@
 using BusQRSystem.Data;
 using BusQRSystem.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace BusQRSystem.Controllers;
 
@@ -9,129 +8,58 @@ namespace BusQRSystem.Controllers;
 [Route("api/[controller]")]
 public class TripPassengersController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly InMemoryBusStore _store;
 
-    public TripPassengersController(AppDbContext context)
+    public TripPassengersController(InMemoryBusStore store)
     {
-        _context = context;
+        _store = store;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TripPassengerResponse>>> GetTripPassengers([FromQuery] int? tripId)
+    public ActionResult<IEnumerable<TripPassengerResponse>> GetTripPassengers([FromQuery] int? tripId)
     {
-        var query = _context.TripPassengers
-            .AsNoTracking()
-            .Include(tripPassenger => tripPassenger.Passenger)
-            .Include(tripPassenger => tripPassenger.Trip)
-            .AsQueryable();
-
+        _store.SeedDemo();
+        var query = _store.TripPassengers.AsEnumerable();
         if (tripId.HasValue)
         {
-            query = query.Where(tripPassenger => tripPassenger.TripId == tripId.Value);
+            query = query.Where(item => item.TripId == tripId.Value);
         }
 
-        var passengers = await query
-            .OrderBy(tripPassenger => tripPassenger.TripId)
-            .ThenBy(tripPassenger => tripPassenger.KoltukNo)
-            .Select(tripPassenger => ToResponse(tripPassenger))
-            .ToListAsync();
-
-        return Ok(passengers);
+        return Ok(query
+            .OrderBy(item => item.TripId)
+            .ThenBy(item => item.KoltukNo)
+            .Select(ToResponse));
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<TripPassengerResponse>> GetTripPassenger(int id)
+    public ActionResult<TripPassengerResponse> GetTripPassenger(int id)
     {
-        var tripPassenger = await _context.TripPassengers
-            .AsNoTracking()
-            .Include(existing => existing.Passenger)
-            .Include(existing => existing.Trip)
-            .FirstOrDefaultAsync(existing => existing.Id == id);
-
-        return tripPassenger is null ? NotFound() : Ok(ToResponse(tripPassenger));
+        var ticket = _store.TripPassengers.FirstOrDefault(item => item.Id == id);
+        return ticket is null ? NotFound() : Ok(ToResponse(ticket));
     }
 
     [HttpPost]
-    public async Task<ActionResult<TripPassengerResponse>> CreateTripPassenger(CreateTripPassengerRequest request)
+    public ActionResult<TripPassengerResponse> CreateTripPassenger(CreateTripPassengerRequest request)
     {
-        var tripExists = await _context.Trips.AnyAsync(trip => trip.Id == request.TripId);
-        if (!tripExists)
+        if (_store.Trips.All(trip => trip.Id != request.TripId))
         {
             return BadRequest("Seçilen sefer bulunamadı.");
         }
 
-        var passengerExists = await _context.Users.AnyAsync(user => user.Id == request.PassengerId && user.Role == "Passenger");
-        if (!passengerExists)
+        if (_store.Users.All(user => user.Id != request.PassengerId))
         {
-            return BadRequest("Seçilen yolcu bulunamadı veya rolü Passenger değil.");
+            return BadRequest("Seçilen yolcu bulunamadı.");
         }
 
-        var seatTaken = await _context.TripPassengers.AnyAsync(tripPassenger =>
-            tripPassenger.TripId == request.TripId && tripPassenger.KoltukNo == request.KoltukNo);
-        if (seatTaken)
-        {
-            return Conflict("Bu seferde seçilen koltuk dolu.");
-        }
-
-        var ticket = new TripPassenger
+        var ticket = _store.AddTripPassenger(new TripPassenger
         {
             TripId = request.TripId,
             PassengerId = request.PassengerId,
             KoltukNo = request.KoltukNo,
             BiletAktifMi = request.BiletAktifMi
-        };
+        });
 
-        _context.TripPassengers.Add(ticket);
-        await _context.SaveChangesAsync();
-
-        var created = await _context.TripPassengers
-            .AsNoTracking()
-            .Include(existing => existing.Passenger)
-            .Include(existing => existing.Trip)
-            .FirstAsync(existing => existing.Id == ticket.Id);
-
-        return CreatedAtAction(nameof(GetTripPassenger), new { id = ticket.Id }, ToResponse(created));
-    }
-
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> UpdateTripPassenger(int id, UpdateTripPassengerRequest request)
-    {
-        var ticket = await _context.TripPassengers.FindAsync(id);
-        if (ticket is null)
-        {
-            return NotFound();
-        }
-
-        var seatTaken = await _context.TripPassengers.AnyAsync(tripPassenger =>
-            tripPassenger.Id != id &&
-            tripPassenger.TripId == request.TripId &&
-            tripPassenger.KoltukNo == request.KoltukNo);
-        if (seatTaken)
-        {
-            return Conflict("Bu seferde seçilen koltuk dolu.");
-        }
-
-        ticket.TripId = request.TripId;
-        ticket.PassengerId = request.PassengerId;
-        ticket.KoltukNo = request.KoltukNo;
-        ticket.BiletAktifMi = request.BiletAktifMi;
-
-        await _context.SaveChangesAsync();
-        return NoContent();
-    }
-
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteTripPassenger(int id)
-    {
-        var ticket = await _context.TripPassengers.FindAsync(id);
-        if (ticket is null)
-        {
-            return NotFound();
-        }
-
-        _context.TripPassengers.Remove(ticket);
-        await _context.SaveChangesAsync();
-        return NoContent();
+        return CreatedAtAction(nameof(GetTripPassenger), new { id = ticket.Id }, ToResponse(ticket));
     }
 
     private static TripPassengerResponse ToResponse(TripPassenger tripPassenger) =>
@@ -140,6 +68,7 @@ public class TripPassengersController : ControllerBase
             tripPassenger.TripId,
             tripPassenger.PassengerId,
             $"{tripPassenger.Passenger.Ad} {tripPassenger.Passenger.Soyad}",
+            tripPassenger.Passenger.QrCodeValue,
             tripPassenger.KoltukNo,
             tripPassenger.BiletAktifMi);
 }
@@ -153,5 +82,6 @@ public record TripPassengerResponse(
     int TripId,
     int PassengerId,
     string PassengerName,
+    string QrCodeValue,
     string KoltukNo,
     bool BiletAktifMi);

@@ -1,7 +1,6 @@
 using BusQRSystem.Data;
 using BusQRSystem.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace BusQRSystem.Controllers;
 
@@ -9,45 +8,35 @@ namespace BusQRSystem.Controllers;
 [Route("api/[controller]")]
 public class ScanLogsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly InMemoryBusStore _store;
 
-    public ScanLogsController(AppDbContext context)
+    public ScanLogsController(InMemoryBusStore store)
     {
-        _context = context;
+        _store = store;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ScanLogResponse>>> GetScanLogs([FromQuery] int? tripId)
+    public ActionResult<IEnumerable<ScanLogResponse>> GetScanLogs([FromQuery] int? tripId)
     {
-        var query = _context.ScanLogs
-            .AsNoTracking()
-            .Include(log => log.Passenger)
-            .Include(log => log.ScannedByStaff)
-            .AsQueryable();
-
+        var query = _store.ScanLogs.AsEnumerable();
         if (tripId.HasValue)
         {
             query = query.Where(log => log.TripId == tripId.Value);
         }
 
-        var logs = await query
-            .OrderByDescending(log => log.ScanTime)
-            .Select(log => ToResponse(log))
-            .ToListAsync();
-
-        return Ok(logs);
+        return Ok(query.OrderByDescending(log => log.ScanTime).Select(ToResponse));
     }
 
     [HttpPost("qr")]
-    public async Task<ActionResult<ScanLogResponse>> CreateQrScan(CreateQrScanRequest request)
+    public ActionResult<ScanLogResponse> CreateQrScan(CreateQrScanRequest request)
     {
-        var passenger = await _context.Users.FirstOrDefaultAsync(user => user.QrCodeValue == request.QrCodeValue);
+        var passenger = _store.Users.FirstOrDefault(user => user.QrCodeValue == request.QrCodeValue);
         if (passenger is null)
         {
             return NotFound("QR koduna ait yolcu bulunamadı.");
         }
 
-        var hasActiveTicket = await _context.TripPassengers.AnyAsync(ticket =>
+        var hasActiveTicket = _store.TripPassengers.Any(ticket =>
             ticket.TripId == request.TripId &&
             ticket.PassengerId == passenger.Id &&
             ticket.BiletAktifMi);
@@ -56,34 +45,25 @@ public class ScanLogsController : ControllerBase
             return BadRequest("Bu yolcunun seçilen sefer için aktif bileti yok.");
         }
 
-        var staffExists = await _context.Users.AnyAsync(user =>
+        var staff = _store.Users.FirstOrDefault(user =>
             user.Id == request.ScannedByStaffId &&
             (user.Role == "Staff" || user.Role == "Admin"));
-        if (!staffExists)
+        if (staff is null)
         {
             return BadRequest("QR okutan personel bulunamadı veya yetkili değil.");
         }
 
-        var log = new ScanLog
+        var log = _store.AddScanLog(new ScanLog
         {
             TripId = request.TripId,
             PassengerId = passenger.Id,
-            ScannedByStaffId = request.ScannedByStaffId,
+            ScannedByStaffId = staff.Id,
             ScanType = request.ScanType,
             LocationType = request.LocationType,
             ScanTime = DateTime.UtcNow
-        };
+        });
 
-        _context.ScanLogs.Add(log);
-        await _context.SaveChangesAsync();
-
-        var created = await _context.ScanLogs
-            .AsNoTracking()
-            .Include(existing => existing.Passenger)
-            .Include(existing => existing.ScannedByStaff)
-            .FirstAsync(existing => existing.Id == log.Id);
-
-        return CreatedAtAction(nameof(GetScanLogs), new { tripId = request.TripId }, ToResponse(created));
+        return CreatedAtAction(nameof(GetScanLogs), new { tripId = request.TripId }, ToResponse(log));
     }
 
     private static ScanLogResponse ToResponse(ScanLog log) =>

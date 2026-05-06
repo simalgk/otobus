@@ -5,3 +5,4 @@ obj/
 .appdata/
 .dotnet-home/
 .nuget-packages/
+.verify-build/
