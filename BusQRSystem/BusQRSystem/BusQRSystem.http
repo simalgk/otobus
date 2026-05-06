@@ -1,0 +1,6 @@
+@BusQRSystem_HostAddress = http://localhost:5112
+
+GET {{BusQRSystem_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
