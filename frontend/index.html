@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Otobüs Takip Sistemi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Muavin Alert Banner -->
+  <div class="alert-banner" id="alertBanner"></div>
+
+  <header>
+    <div class="header-inner">
+      <div class="route-badge"><span class="dot pulse"></span>CANLI TAKİP</div>
+      <h1>QR OTOBÜS TAKİP</h1>
+      <div class="route-line">
+        <span class="city">ISPARTA</span>
+        <div class="road">
+          <span class="bus-icon">🚌</span>
+          <div class="road-line"></div>
+        </div>
+        <span class="city">İSTANBUL</span>
+      </div>
+      <p class="trip-info">Sefer No: <strong>IS-3421</strong> &nbsp;|&nbsp; Kalkış: <strong>08:30</strong></p>
+    </div>
+  </header>
+
+  <!-- Stat Cards -->
+  <section class="cards">
+    <div class="card card-total">
+      <div class="card-icon">👥</div>
+      <div class="card-content">
+        <span class="card-label">Toplam Yolcu</span>
+        <span class="card-value" id="totalCount">0</span>
+      </div>
+    </div>
+    <div class="card card-settled">
+      <div class="card-icon">✅</div>
+      <div class="card-content">
+        <span class="card-label">Yerleşti</span>
+        <span class="card-value" id="settledCount">0</span>
+      </div>
+    </div>
+    <div class="card card-boarded">
+      <div class="card-icon">🚶</div>
+      <div class="card-content">
+        <span class="card-label">Bindi / Ayakta</span>
+        <span class="card-value" id="boardedCount">0</span>
+      </div>
+    </div>
+    <div class="card card-outside">
+      <div class="card-icon">🔴</div>
+      <div class="card-content">
+        <span class="card-label">Dışarıda</span>
+        <span class="card-value" id="outsideCount">0</span>
+      </div>
+    </div>
+    <div class="card card-waiting">
+      <div class="card-icon">🟡</div>
+      <div class="card-content">
+        <span class="card-label">Henüz Binmedi</span>
+        <span class="card-value" id="waitingCount">0</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="two-col">
+
+    <!-- LEFT: Kapı QR Okuyucu -->
+    <section class="panel qr-panel">
+      <div class="section-header">
+        <h2><span class="bracket">[</span> 🚪 KAPI QR OKUYUCU <span class="bracket">]</span></h2>
+        <p class="sub">Yolcu otobüse binerken kapıdaki okuyucuya biletini okuttur</p>
+      </div>
+      <div class="btn-grid" id="qrButtons"></div>
+    </section>
+
+    <!-- RIGHT: Koltuk & Kemer Sensörü -->
+    <section class="panel sensor-panel">
+      <div class="section-header">
+        <h2><span class="bracket">[</span> 💺 KOLTUK & KEMER SENSÖRÜ <span class="bracket">]</span></h2>
+        <p class="sub">Yolcu koltuğuna oturup kemerini takınca otomatik tetiklenir</p>
+      </div>
+      <div class="sensor-grid" id="sensorButtons"></div>
+    </section>
+
+  </div>
+
+  <!-- Muavin Ekranı -->
+  <section class="panel muavin-panel">
+    <div class="section-header">
+      <h2><span class="bracket">[</span> 👨‍✈️ MUAVİN EKRANI <span class="bracket">]</span></h2>
+      <p class="sub">Dikkat gerektiren yolcular burada listelenir</p>
+    </div>
+    <div class="alert-list" id="alertList">
+      <p class="empty-msg">Şu an uyarı yok ✓</p>
+    </div>
+  </section>
+
+  <!-- Yolcu Listesi -->
+  <section class="panel table-section">
+    <div class="section-header">
+      <h2><span class="bracket">[</span> YOLCU LİSTESİ <span class="bracket">]</span></h2>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>KOLTUK</th>
+            <th>AD SOYAD</th>
+            <th>DURUM</th>
+            <th>KEMER</th>
+            <th>SON OLAY</th>
+          </tr>
+        </thead>
+        <tbody id="passengerTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
