@@ -1,3 +1,8 @@
 .vs
 bin/
 obj/
+*.csproj.user
+.appdata/
+.dotnet-home/
+.nuget-packages/
+.verify-build/
